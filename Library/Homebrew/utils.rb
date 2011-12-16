@@ -111,6 +111,7 @@ def curl *args
   args = [HOMEBREW_CURL_ARGS, HOMEBREW_USER_AGENT, *args]
   # See https://github.com/mxcl/homebrew/issues/6103
   args << "--insecure" if MacOS.version < 10.6
+  args << "--verbose" if ENV['HOMEBREW_CURL_VERBOSE']
 
   safe_system curl, *args
 end
@@ -339,7 +340,7 @@ module MacOS extend self
 
   def clang_build_version
     @clang_build_version ||= if File.exist? "/usr/bin/clang"
-      `/usr/bin/clang --version` =~ %r[tags/Apple/clang-(\d{2,3}(\.\d)*)]
+      `/usr/bin/clang --version` =~ %r[tags/Apple/clang-(\d+(\.\d+)*)]
       $1
     end
   end
