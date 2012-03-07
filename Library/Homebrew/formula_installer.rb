@@ -16,10 +16,40 @@ class FormulaInstaller
     @show_header = true
     @ignore_deps = ARGV.include? '--ignore-dependencies' || ARGV.interactive?
     @install_bottle = !ARGV.build_from_source? && ff.bottle_up_to_date?
+
+    check_install_sanity
+  end
+
+  def check_install_sanity
+    if f.installed?
+      raise CannotInstallFormulaError, "#{f}-#{f.version} already installed"
+    end
+
+    # Building head-only without --HEAD is an error
+    if not ARGV.build_head? and f.standard.nil?
+      raise CannotInstallFormulaError, <<-EOS.undent
+        #{f} is a head-only formula
+        Install with `brew install --HEAD #{f.name}
+      EOS
+    end
+
+    # Building stable-only with --HEAD is an error
+    if ARGV.build_head? and f.unstable.nil?
+      raise CannotInstallFormulaError, "No head is defined for #{f.name}"
+    end
   end
 
   def install
-    raise FormulaAlreadyInstalledError, f if f.installed? and not ARGV.force?
+    # not in initialize so upgrade can unlink the active keg before calling this
+    # function but after instantiating this class so that it can avoid having to
+    # relink the active keg if possible (because it is slow).
+    if f.linked_keg.directory?
+      # some other version is already installed *and* linked
+      raise CannotInstallFormulaError, <<-EOS.undent
+        #{f}-#{f.linked_keg.realpath.basename} already installed
+        To install this version, first `brew unlink #{f}'
+      EOS
+    end
 
     unless ignore_deps
       f.check_external_deps
@@ -342,6 +372,7 @@ def external_dep_check dep, type
     when :perl then %W{/usr/bin/env perl -e use\ #{dep}}
     when :chicken then %W{/usr/bin/env csi -e (use #{dep})}
     when :node then %W{/usr/bin/env node -e require('#{dep}');}
+    when :lua then %W{/usr/bin/env luarocks show #{dep}}
   end
 end
 
@@ -365,7 +396,7 @@ class Formula
   end
 
   def check_external_deps
-    [:ruby, :python, :perl, :jruby, :rbx, :chicken, :node].each do |type|
+    [:ruby, :python, :perl, :jruby, :rbx, :chicken, :node, :lua].each do |type|
       self.external_deps[type].each do |dep|
         unless quiet_system(*external_dep_check(dep, type))
           raise UnsatisfiedExternalDependencyError.new(dep, type)
