@@ -21,4 +21,10 @@ class Ggobi < Formula
                           "--with-all-plugins", "--prefix=#{prefix}"
     system "make install"
   end
+
+  def patches
+    # Patch for compiling against Graphviz >= 2.22
+    # see http://code.google.com/p/ggobi-documentation/issues/detail?id=29 
+    "https://gist.github.com/raw/2025288/7d9336ea869f19d78812c99a2d814ace1bd31692/ggobi-2.1.8-graphviz.patch"
+  end
 end
